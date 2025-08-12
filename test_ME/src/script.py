@@ -16,7 +16,7 @@ def telnet_connect(host, username, password):
         
         #таймаут
         child.timeout = 30
-        
+
         #ожидание приглашения
         index = child.expect(['login:', pexpect.TIMEOUT, pexpect.EOF])
 
@@ -28,15 +28,15 @@ def telnet_connect(host, username, password):
             
             #проверка успешности
             index = child.expect([
-                'Successfully connected',  # Ожидаем сообщение о подключении
-                'Welcome',                # Или приветствие
-                '#', '>',                # Или сразу приглашение
+                'Successfully connected',
+                'Welcome',
+                '#', '>',
                 pexpect.TIMEOUT
             ], timeout=15)
 
             if index in (0, 1):  # Если получили приветствие
-                child.expect(['#', '>'])  # Ждём окончательное приглашение
-                child.sendline('\n')
+                child.expect(['#', '>'])
+                child.sendline('\n') #вот почему оно тут нужно?
             elif index in (2, 3):  # Если сразу получили приглашение
                 pass  # Ничего не делаем
             else:  # Таймаут или ошибка
@@ -49,26 +49,25 @@ def telnet_connect(host, username, password):
         print(f"Ошибка: {str(e)}")
         return None
 
-session = telnet_connect('r1-g3', username, password)
+session = telnet_connect('r2-g3', username, password)
 if session:
     try:
         #приглашение перед отправкой
         session.expect(['#', '>'])
-        session.sendline('show version')
+        session.sendline('show route vrf G3')
         
         #ожидаем эхо команды
-        session.expect('show version\r\n')
+        time.sleep(1)
+        session.expect('show route vrf G3\r\n')
+
+        index = session.expect(['Codes: ', r'#', pexpect.TIMEOUT], timeout=15)
         
-        # Теперь ждем именно маркер начала нужного нам вывода
-        index = session.expect(['Eltex ', r'#', pexpect.TIMEOUT], timeout=15)
-        
-        if index == 0:  # Если нашли "Eltex ME5200S"
-            session.expect(r'0/')
+        if index == 0:
+            session.expect(r'0/ME5200S')
             full_output = session.before
             
-            # Выводим результат между "Eltex ME5200S" и приглашением
-            print("\nРезультат команды:")
-            print("Eltex " + full_output.split("Eltex ")[-1].strip())
+            print("\nРезультат:")
+            print("Codes: " + full_output.split("Codes: ")[-1].strip())
             
         elif index == 1:  # Если сразу получили приглашение
             print("\nКоманда не вернула ожидаемый вывод")
