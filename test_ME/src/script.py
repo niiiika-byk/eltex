@@ -1,5 +1,5 @@
 import pexpect
-import sys
+import textfsm
 import os
 import time
 
@@ -19,7 +19,6 @@ def telnet_connect(host, username, password):
 
         #ожидание приглашения
         index = child.expect(['login:', pexpect.TIMEOUT, pexpect.EOF])
-
         
         if index == 0 :
             child.sendline(username)
@@ -37,9 +36,9 @@ def telnet_connect(host, username, password):
             if index in (0, 1):  # Если получили приветствие
                 child.expect(['#', '>'])
                 child.sendline('\n') #вот почему оно тут нужно?
-            elif index in (2, 3):  # Если сразу получили приглашение
-                pass  # Ничего не делаем
-            else:  # Таймаут или ошибка
+            elif index in (2, 3):
+                pass
+            else:
                 print("Ошибка: не получено приглашение после входа")
                 child.close()
                 return None
@@ -57,7 +56,6 @@ if session:
         session.sendline('show route vrf G3')
         
         #ожидаем эхо команды
-        time.sleep(1)
         session.expect('show route vrf G3\r\n')
 
         index = session.expect(['Codes: ', r'#', pexpect.TIMEOUT], timeout=15)
@@ -67,8 +65,18 @@ if session:
             full_output = session.before
             
             print("\nРезультат:")
-            print("Codes: " + full_output.split("Codes: ")[-1].strip())
-            
+            vrf = full_output.split('R - RIP')[-1].split('Total entries:')[0].strip()
+            vrf = '\n'.join(line.strip() for line in vrf.splitlines())
+            print(vrf)
+
+            #обработка вывода результата подключенных клиентов через vrf
+            with open('templates/vrf_client.template') as template:
+                fsm = textfsm.TextFSM(template)
+                result = fsm.ParseText(vrf)
+                print(fsm.header)
+                print(result)
+            #
+                 
         elif index == 1:  # Если сразу получили приглашение
             print("\nКоманда не вернула ожидаемый вывод")
             print("Получено:", session.before)

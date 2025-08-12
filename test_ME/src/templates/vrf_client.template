@@ -1,0 +1,11 @@
+#определение переменных
+Value PROTOCOL (B\s+BV|S)
+Value NETWORK (\d+\.\d+\.\d+\.\d+/32)
+Value VIA (\d+\.\d+\.\d+\.\d+|\w+)
+Value METRIC (\[\d+/\d+\]?)
+Value UPTIME (\d+d\d{2}h\d{2}m\d{2}s|\d{2}h\d{2}m\d{2}s)
+Value INTERFACE (\S+?)
+
+#определение состояний
+Start
+  ^\s*${PROTOCOL}\s+${NETWORK}\s+${VIA}\s*${METRIC}?\s*,?\s*${UPTIME}\s*,?\s*${INTERFACE}? -> Record
