@@ -81,7 +81,7 @@ def execute_vrf_check(host):
                 full_output = session.before
                 
                 vrf = full_output.split('R - RIP')[-1].split('Total entries:')[0].strip()
-                vrf = '\n'.join(line.strip() for line in vrf.splitlines())
+                vrf = '\n'.join(line.strip() for line in vrf.splitlines()) #убираем отступые перед строками
                 #print(vrf)
 
                 #обработка вывода результата подключенных клиентов через vrf
