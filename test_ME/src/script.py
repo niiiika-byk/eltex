@@ -85,10 +85,12 @@ def execute_vrf_check(host):
                 #print(vrf)
 
                 #обработка вывода результата подключенных клиентов через vrf
-                with open('templates/vrf_client.template') as template:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                template_path = os.path.join(base_dir, 'templates', 'vrf_client.template')
+                with open(template_path) as template:
                     fsm = textfsm.TextFSM(template)
                     result['data'] = fsm.ParseText(vrf)
-                    #print(tabulate(result, headers=fsm.header, tablefmt="grid"))
+                    print(tabulate(result['data'], headers=fsm.header, tablefmt="grid"))
                 #
                     
             elif index == 1:  # Если сразу получили приглашение
