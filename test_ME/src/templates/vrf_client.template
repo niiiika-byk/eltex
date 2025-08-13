@@ -1,5 +1,5 @@
-Value PROTOCOL (B|S)
-Value ATTRIBUTES (BV|\S*)
+Value PROTOCOL (B|S|O)
+Value ATTRIBUTES (BV|EA|\S*)
 Value NETWORK (\d+\.\d+\.\d+\.\d+/32)
 Value NEXTHOP (via\s+\d+\.\d+\.\d+\.\d+)
 Value METRIC (\[\d+\/\d+\])

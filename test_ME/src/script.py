@@ -48,7 +48,7 @@ def telnet_connect(host, username, password):
         print(f"Ошибка: {str(e)}")
         return None
 
-session = telnet_connect('r4-g3', username, password)
+session = telnet_connect('r1-g3', username, password)
 if session:
     try:
         #приглашение перед отправкой
