@@ -6,14 +6,12 @@ from tabulate import tabulate
 username = os.environ.get('ROUTER_USER')
 password = os.environ.get('ROUTER_PASSWORD')
 
+#функция для подключения к маршрутизатору
 def telnet_connect(host, username, password):
     try:
         #запрос в консоль
         child = pexpect.spawn(f'telnet {host}', encoding='utf-8')
-        
-        #логирование для проверки выполнения скрипта
-        #child.logfile = sys.stdout 
-        
+
         #таймаут
         child.timeout = 30
 
@@ -37,56 +35,80 @@ def telnet_connect(host, username, password):
                 child.expect(['#', '>'])
                 child.sendline('\n') #вот почему оно тут нужно?
             elif index in (2, 3):
+                #print("\nПриглашение сразу на вход")
                 pass
             else:
-                print("Ошибка: не получено приглашение после входа")
+                #print("Ошибка: не получено приглашение после входа")
                 child.close()
                 return None
             return child
             
     except Exception as e:
-        print(f"Ошибка: {str(e)}")
+        #print(f"Ошибка: {str(e)}")
         return None
 
-session = telnet_connect('r1-g3', username, password)
-if session:
-    try:
-        #приглашение перед отправкой
-        session.expect(['#', '>'])
-        session.sendline('show route vrf G3')
-        
-        #ожидаем эхо команды
-        session.expect('show route vrf G3\r\n')
-
-        index = session.expect(['Codes: ', r'#', pexpect.TIMEOUT], timeout=15)
-        
-        if index == 0:
-            session.expect(r'0/ME5200S')
-            full_output = session.before
-            
-            vrf = full_output.split('R - RIP')[-1].split('Total entries:')[0].strip()
-            vrf = '\n'.join(line.strip() for line in vrf.splitlines())
-            #print(vrf)
-
-            #обработка вывода результата подключенных клиентов через vrf
-            with open('templates/vrf_client.template') as template:
-                fsm = textfsm.TextFSM(template)
-                result = fsm.ParseText(vrf)
-                print(tabulate(result, headers=fsm.header, tablefmt="grid"))
-            #
-                 
-        elif index == 1:  # Если сразу получили приглашение
-            print("\nКоманда не вернула ожидаемый вывод")
-            print("Получено:", session.before)
-            
-        else:  # Таймаут
-            print("\nТаймаут при ожидании вывода команды")
-            print("Получено:", session.before)
-
-    except Exception as e:
-        print(f"Ошибка выполнения команды: {str(e)}")
+def execute_vrf_check(host):
+    session = telnet_connect(host, username, password)
     
-    finally:
-        session.sendline('logout')
-        session.expect(pexpect.EOF)
-        session.close()
+    if not session:
+        return{
+            'status': False,
+            'error': 'Не удалось подключиться к маршрутизатору',
+            'data': [],
+            'raw_output': ''
+        }
+
+    result = {
+        'status': True,
+        'data': [],
+        'error': None,
+        'raw_output': ''
+    }
+
+    if session:
+        try:
+            #приглашение перед отправкой
+            session.expect(['#', '>'])
+            session.sendline('show route vrf G3')
+            
+            #ожидаем эхо команды
+            session.expect('show route vrf G3\r\n')
+
+            index = session.expect(['Codes: ', r'#', pexpect.TIMEOUT], timeout=15)
+            
+            if index == 0:
+                session.expect(r'0/ME5200S')
+                full_output = session.before
+                
+                vrf = full_output.split('R - RIP')[-1].split('Total entries:')[0].strip()
+                vrf = '\n'.join(line.strip() for line in vrf.splitlines())
+                #print(vrf)
+
+                #обработка вывода результата подключенных клиентов через vrf
+                with open('templates/vrf_client.template') as template:
+                    fsm = textfsm.TextFSM(template)
+                    result['data'] = fsm.ParseText(vrf)
+                    #print(tabulate(result, headers=fsm.header, tablefmt="grid"))
+                #
+                    
+            elif index == 1:  # Если сразу получили приглашение
+                result['status'] = False
+                result['error'] = "Команда не вернула ожидаемый вывод"
+                result['data'] = [session.before]
+                
+            else:  # Таймаут
+                result['status'] = False
+                result['error'] = "Таймаут при ожидании вывода команды"
+                result['data'] = [session.before]
+
+
+        except Exception as e:
+            result['status'] = False
+            result['error'] = f"Ошибка выполнения команды: {str(e)}"
+            
+        finally:
+            session.sendline('logout')
+            session.expect(pexpect.EOF)
+            session.close()
+
+        return result
