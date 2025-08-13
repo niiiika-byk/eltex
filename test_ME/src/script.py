@@ -66,7 +66,7 @@ if session:
             
             vrf = full_output.split('R - RIP')[-1].split('Total entries:')[0].strip()
             vrf = '\n'.join(line.strip() for line in vrf.splitlines())
-            print(vrf)
+            #print(vrf)
 
             #обработка вывода результата подключенных клиентов через vrf
             with open('templates/vrf_client.template') as template:
