@@ -1,7 +1,7 @@
 import pexpect
 import textfsm
 import os
-import time
+from tabulate import tabulate
 
 username = os.environ.get('ROUTER_USER')
 password = os.environ.get('ROUTER_PASSWORD')
@@ -73,8 +73,7 @@ if session:
             with open('templates/vrf_client.template') as template:
                 fsm = textfsm.TextFSM(template)
                 result = fsm.ParseText(vrf)
-                print(fsm.header)
-                print(result)
+                print(tabulate(result, headers=fsm.header, tablefmt="grid"))
             #
                  
         elif index == 1:  # Если сразу получили приглашение
