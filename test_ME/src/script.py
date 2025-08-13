@@ -48,7 +48,7 @@ def telnet_connect(host, username, password):
         print(f"Ошибка: {str(e)}")
         return None
 
-session = telnet_connect('r2-g3', username, password)
+session = telnet_connect('r4-g3', username, password)
 if session:
     try:
         #приглашение перед отправкой
@@ -64,7 +64,6 @@ if session:
             session.expect(r'0/ME5200S')
             full_output = session.before
             
-            print("\nРезультат:")
             vrf = full_output.split('R - RIP')[-1].split('Total entries:')[0].strip()
             vrf = '\n'.join(line.strip() for line in vrf.splitlines())
             print(vrf)
