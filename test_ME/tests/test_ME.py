@@ -33,7 +33,7 @@ def test_vrf_check(host):
     
     #проверяем наличие всех ip в полученных данных
     for i, row in enumerate(result["data"]):
-        if len(row) > 2:  #
+        if len(row) > 2:
             ip_str = row[2]
             if is_ip_in_range(ip_str, start_ip, end_ip):
                 ips_in_range.append(ip_str.split("/")[0])
