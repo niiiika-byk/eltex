@@ -1,10 +1,10 @@
 Value PROTOCOL (B|S|O)
 Value ATTRIBUTES (BV|EA|\S*)
-Value NETWORK (\d+\.\d+\.\d+\.\d+/32)
-Value NEXTHOP (via\s+\d+\.\d+\.\d+\.\d+)
-Value METRIC (\[\d+\/\d+\])
-Value UPTIME (\d+d\d+h\d+m)
+Value NETWORK (\d+\.\d+\.\d+\.\d+\/32)
+Value NEXTHOP (via\s+\d+\.\d+\.\d+\.\d+|is directly connected)
+Value METRIC (\[\d+\/\d+\]|\S*)
+Value UPTIME (\S+)
 Value INTERFACE (\S*)
 
 Start
-  ^${PROTOCOL}\s+${ATTRIBUTES}\s+${NETWORK}\s+${NEXTHOP}\s*\,?\s*${METRIC}\s*\,?\s*${UPTIME}\s*\,?\s*${INTERFACE} -> Record
+  ^${PROTOCOL}\s+${ATTRIBUTES}\s+${NETWORK}\s+${NEXTHOP}\s*\,?\s*${METRIC}?\s*\,?\s*${UPTIME}?\s*\,?\s*${INTERFACE}? -> Record
