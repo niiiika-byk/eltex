@@ -1,7 +1,6 @@
 /.idea
 /.vscode
-/ELTEX_ME_Command_Reference_3.9.pdf
-/ELTEX_ME_Config_Guide_3.9.pdf
+/theory
 test_ME/tests/__pycache__
 test_ME/src/.pytest_cache
 test_ME/src/__pycache__
