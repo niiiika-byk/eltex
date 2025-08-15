@@ -2,7 +2,9 @@
 /.vscode
 /theory
 test_ME/tests/__pycache__
-test_ME/src/.pytest_cache
+test_ME/src/.pytest_cache/v
+test_ME/src/.pytest_cache/.gitignore
+est_ME/src/.pytest_cache/CACHEDIR.TAG
 test_ME/src/__pycache__
 test_1/src/.pytest_cache
 test_1/src/__pycache__
