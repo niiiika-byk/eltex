@@ -11,3 +11,4 @@ task_1/tests/.pytest_cache
 task_0/src/.pytest_cache
 task_0/src/__pycache__
 task_0/tests/.pytest_cache
+task_2/tests/__pycache__
