@@ -15,13 +15,13 @@ def send_icmp_via_vlan(src_ip, dst_ip, vlan_id, interface):
     # Создаем пакет с VLAN-тегом
     pkt = Ether(src=MAC_SRC, dst=MAC_DST) / Dot1Q(vlan=vlan_id) / IP(src=src_ip, dst=dst_ip) / ICMP(id=12345, seq=1)
     # Без VLAN-тега
-    pkt = Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=src_ip, dst=dst_ip) / ICMP(id=12345, seq=1)
-
+    #pkt = Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=src_ip, dst=dst_ip) / ICMP(id=12345, seq=1)
     
     # Отправляем пакет и ждем ответ
-    ans = srp1(pkt, iface="enp3s0", timeout=TIMEOUT, verbose=0, 
+    ans = srp1(pkt, iface=interface, timeout=TIMEOUT, verbose=0, 
            filter=f"ether src {MAC_DST} and icmp")
 
+    ans.show()
     return ans
 
 @pytest.mark.parametrize("ce_ip", IP_DST)
