@@ -1,6 +1,7 @@
 /.idea
 /.vscode
 /theory
+/venv
 test_ME/tests/__pycache__
 task_1/src/.pytest_cache
 task_1/venv
