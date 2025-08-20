@@ -21,7 +21,6 @@ def send_icmp_via_vlan(src_ip, dst_ip, vlan_id, interface):
     ans = srp1(pkt, iface=interface, timeout=TIMEOUT, verbose=0, 
            filter=f"ether src {MAC_DST} and icmp")
 
-    ans.show()
     return ans
 
 @pytest.mark.parametrize("ce_ip", IP_DST)
