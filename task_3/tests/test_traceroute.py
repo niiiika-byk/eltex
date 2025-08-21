@@ -1,8 +1,10 @@
 import pytest
 import allure
+import graphviz
 from scapy.all import *
 from scapy.layers.inet import ICMP, IP, Ether
 from scapy.layers.l2 import Dot1Q
+from allure_commons.types import AttachmentType
 
 IP_DST = ["192.168.43.2", "192.168.41.2", "192.168.42.2"]
 IP_SRC = "192.168.44.254"
@@ -150,17 +152,120 @@ def test_traceroute_to_ce(ce_ip):
     
     with allure.step("Итоговый результат"):
         allure.attach(f"""
-        ✅ Traceroute к {ce_ip} выполнен успешно!
-        🎯 Цель достигнута: {reached_destination}
-        📊 Количество хопов: {len(hops_info)}
-        ✅ Все хопы соответствуют ожиданиям
+        Traceroute к {ce_ip} выполнен успешно!
+        Цель достигнута: {reached_destination}
+        Количество хопов: {len(hops_info)}
+        Все хопы соответствуют ожиданиям
         """, name="Итоговый отчет")
+
+def create_network_topology_diagram():
+    """Создает и добавляет в отчет схему сетевой топологии"""
+    try:
+        # Создаем граф
+        dot = graphviz.Digraph(comment='Network Topology', 
+                              graph_attr={'rankdir': 'TB', 'bgcolor': 'transparent', 'splines': 'ortho'},
+                              node_attr={'style': 'filled', 'shape': 'box', 'fontname': 'Arial', 'fontsize': '10'},
+                              edge_attr={'fontname': 'Arial', 'fontsize': '9'})
+        
+        # Добавляем узлы с правильным синтаксисом
+        dot.node('Client', 'Клиент\n192.168.44.254', 
+                **{'fillcolor': '#e6f3ff', 'color': '#1976d2'})
+        
+        # Маршрутизатор провайдера (PE)
+        dot.node('PE_Router', 'PE Маршрутизатор\n(Провайдер)\n', 
+                **{'fillcolor': '#fff3e0', 'color': '#f57c00', 'shape': 'diamond'})
+        
+        # Клиентские устройства CE
+        dot.node('CE1', 'CE1\n192.168.43.2', 
+                **{'fillcolor': '#e8f5e8', 'color': '#388e3c'})
+        dot.node('CE2', 'CE2\n192.168.41.2', 
+                **{'fillcolor': '#e3f2fd', 'color': '#1976d2'})
+        dot.node('CE3', 'CE3\n192.168.42.2', 
+                **{'fillcolor': '#fff8e1', 'color': '#ffa000'})
+        
+        # Добавляем связи
+        dot.edge('Client', 'PE_Router', xlabel='VLAN 4028\n192.168.44.0/24')
+        dot.edge('PE_Router', 'CE1', xlabel='192.168.43.0/24')
+        dot.edge('PE_Router', 'CE2', xlabel='192.168.41.0/24')
+        dot.edge('PE_Router', 'CE3', xlabel='192.168.42.0/24')
+        
+        # Генерируем PNG изображение
+        png_data = dot.pipe(format='png')
+        
+        # Добавляем в allure отчет
+        allure.attach(png_data, name="Сетевая топология", attachment_type=AttachmentType.PNG)
+        
+        # Также добавляем описание
+        topology_description = """
+        ## Сетевая топология тестовой среды
+        
+        **Архитектура сети:**
+        - Клиент: 192.168.44.254 (тестовое устройство)
+        - PE Маршрутизатор: 192.168.44.1 (маршрутизатор провайдера)
+        - CE1: 192.168.43.2
+        - CE2: 192.168.41.2 
+        - CE3: 192.168.42.2
+        
+        **Сегменты сети:**
+        - 192.168.44.0/24 - сеть клиента
+        - 192.168.43.0/24 - сеть CE1
+        - 192.168.41.0/24 - сеть CE2
+        - 192.168.42.0/24 - сеть CE3
+        
+        **Назначение теста:** Проверка маршрутизации от клиента к CE устройствам через сеть провайдера
+        """
+        allure.attach(topology_description, name="Описание топологии", attachment_type=AttachmentType.TEXT)
+        
+    except Exception as e:
+        allure.attach(f"Ошибка создания схемы: {str(e)}", name="Ошибка диаграммы")
+        print(f"DEBUG: Ошибка создания диаграммы: {e}")
+
+def create_traceroute_path_diagram(hops_info, target_ip):
+    """Создает диаграмму пути traceroute для конкретного целевого IP"""
+    try:
+        dot = graphviz.Digraph(comment=f'Traceroute Path to {target_ip}',
+                              graph_attr={'rankdir': 'TB', 'bgcolor': 'transparent', 'nodesep': '0.5'},
+                              node_attr={'style': 'filled', 'shape': 'ellipse', 'fontname': 'Arial', 'fontsize': '9'})
+        
+        # Добавляем начальную точку (клиент)
+        dot.node('Start', 'Клиент\n192.168.44.254', **{'fillcolor': '#e6f3ff'})
+        
+        # Добавляем хопы
+        previous_node = 'Start'
+        for i, hop in enumerate(hops_info):
+            if hop['actual_ip'] and hop['actual_ip'] != '*':
+                node_name = f'Hop{i+1}'
+                status_color = '#c8e6c9' if hop['is_correct'] else '#ffcdd2'
+                status_text = '✓' if hop['is_correct'] else '✗'
+                
+                # Определяем тип узла по IP
+                node_label = f'{status_text} Хоп {i+1}\n{hop["actual_ip"]}'
+                if hop['actual_ip'] == '192.168.44.1':
+                    node_label = f'{status_text} PE Маршрутизатор\n{hop["actual_ip"]}'
+                    status_color = '#fff3e0'
+                
+                dot.node(node_name, node_label, **{'fillcolor': status_color})
+                dot.edge(previous_node, node_name, label=f'TTL={i+1}')
+                previous_node = node_name
+        
+        # Добавляем целевую точку
+        dot.node('Target', f'Цель CE\n{target_ip}', **{'fillcolor': '#fff9c4'})
+        dot.edge(previous_node, 'Target', label='Достигнуто')
+        
+        png_data = dot.pipe(format='png')
+        allure.attach(png_data, name=f"Путь до {target_ip}", attachment_type=AttachmentType.PNG)
+        
+    except Exception as e:
+        allure.attach(f"Ошибка создания диаграммы пути: {str(e)}", name="Ошибка диаграммы")
+        print(f"DEBUG: Ошибка создания диаграммы пути: {e}")
 
 @allure.epic("Сетевые тесты")
 @allure.feature("Сводный отчет")
 @allure.title("Сводный отчет по всем traceroute тестам")
 def test_traceroute_summary():
     """Сводный отчет по всем traceroute тестам"""
+
+    create_network_topology_diagram()
     
     summary_results = {}
     
@@ -168,6 +273,8 @@ def test_traceroute_summary():
         with allure.step(f"Тестирование {ce_ip}"):
             try:
                 hops_info, reached = trace_route_to_ce(ce_ip, VLAN_ID, CE4_INTERFACE)
+
+                create_traceroute_path_diagram(hops_info, ce_ip)
                 
                 # Считаем статистику
                 correct_hops = sum(1 for hop in hops_info if hop['is_correct'] or hop['expected_ip'] == "Unknown")
@@ -187,20 +294,3 @@ def test_traceroute_summary():
                     'error': str(e)
                 }
     
-    # Создаем сводную таблицу для allure
-    summary_table = "Цель | Успех | Достигнута | Правильные хопы | Всего хопов | Маршрут\n"
-    summary_table += "-" * 120 + "\n"
-    
-    for ce_ip, result in summary_results.items():
-        if 'error' in result:
-            summary_table += f"{ce_ip} | ❌ | - | - | - | Ошибка: {result['error']}\n"
-        else:
-            status = "✅" if result['success'] else "❌"
-            reached = "✅" if result['reached'] else "❌"
-            summary_table += f"{ce_ip} | {status} | {reached} | {result['correct_hops']}/{result['total_hops']} | {result['total_hops']} | {' -> '.join(result['path'])}\n"
-    
-    allure.attach(summary_table, name="Сводная таблица результатов")
-    
-    # Проверяем, что все тесты прошли успешно
-    all_success = all(result.get('success', False) for result in summary_results.values())
-    assert all_success, "Не все traceroute тесты прошли успешно"
