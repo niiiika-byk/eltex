@@ -16,3 +16,4 @@ task_2/tests/__pycache__
 task_2/tests/.pytest_cache
 task_3/tests/__pycache__
 task_3/tests/.pytest_cache
+task_3/tests/allure-results
