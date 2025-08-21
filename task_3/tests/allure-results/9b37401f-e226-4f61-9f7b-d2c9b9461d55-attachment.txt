@@ -1,0 +1,3 @@
+DEBUG: Ошибка создания диаграммы пути: string indices must be integers, not 'str'
+DEBUG: Ошибка создания диаграммы пути: string indices must be integers, not 'str'
+DEBUG: Ошибка создания диаграммы пути: string indices must be integers, not 'str'

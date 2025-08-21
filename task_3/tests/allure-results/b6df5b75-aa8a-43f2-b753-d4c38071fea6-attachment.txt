@@ -1,0 +1,1 @@
+Warning: edge labels with splines=curved not supported in dot - use xlabels

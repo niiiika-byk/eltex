@@ -1,0 +1,1 @@
+Ошибка создания диаграммы пути: failed to execute PosixPath('dot'), make sure the Graphviz executables are on your systems' PATH

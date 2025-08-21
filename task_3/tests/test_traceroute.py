@@ -38,13 +38,11 @@ def trace_route_to_ce(dst_ip, vlan_id, interface):
     hops_info = []
     reached_destination = False
     
-    # Создаем таблицу для allure
-    with allure.step(f"Traceroute к {dst_ip} через VLAN {vlan_id}"):
-        allure.attach(f"""
-        Ожидаемый путь для {dst_ip}:
-        {', '.join(EXPECTED_HOPS.get(dst_ip, []))}
-        """, name="Ожидаемый маршрут")
-    
+    # Создаем схему ожидаемого маршрута вместо текста
+    with allure.step(f"Traceroute к {dst_ip}"):
+        # Создаем диаграмму ожидаемого маршрута
+        create_expected_route_diagram(dst_ip)
+        
     for ttl in range(1, MAX_HOPS + 1):
         with allure.step(f"Хоп {ttl}"):
             response_pkt = send_icmp_traceroute_via_vlan(
@@ -109,6 +107,54 @@ def trace_route_to_ce(dst_ip, vlan_id, interface):
                 break
     
     return hops_info, reached_destination
+
+def create_expected_route_diagram(target_ip):
+    """Создает диаграмму ожидаемого маршрута до целевого IP"""
+    try:
+        expected_path = EXPECTED_HOPS.get(target_ip, [])
+        
+        dot = graphviz.Digraph(comment=f'Expected Route to {target_ip}',
+                              graph_attr={'rankdir': 'TB', 'bgcolor': 'transparent', 'nodesep': '0.3'},
+                              node_attr={'style': 'filled', 'shape': 'ellipse', 'fontname': 'Arial', 'fontsize': '10'})
+        
+        # Добавляем начальную точку
+        dot.node('Start', 'Клиент\n192.168.44.254', **{'fillcolor': '#e6f3ff'})
+        
+        # Добавляем ожидаемые хопы
+        previous_node = 'Start'
+        for i, hop_ip in enumerate(expected_path):
+            node_name = f'ExpectedHop{i+1}'
+            
+            # Определяем стиль узла по типу
+            if hop_ip == '192.168.44.1':
+                node_label = f'PE Маршрутизатор\n{hop_ip}'
+                node_color = '#fff3e0'
+            elif hop_ip == target_ip:
+                node_label = f'Цель CE\n{hop_ip}'
+                node_color = '#fff9c4'
+            else:
+                node_label = f'Промежуточный\n{hop_ip}'
+                node_color = '#e8f5e9'
+            
+            dot.node(node_name, node_label, **{'fillcolor': node_color})
+            dot.edge(previous_node, node_name, label=f'TTL={i+1}')
+            previous_node = node_name
+        
+        # Добавляем заголовок
+        dot.attr(label=f'Ожидаемый маршрут до {target_ip}\nВсего хопов: {len(expected_path)}',
+                labelloc='t', fontsize='12', fontname='Arial')
+        
+        png_data = dot.pipe(format='png')
+        allure.attach(png_data, name="Ожидаемый маршрут", attachment_type=AttachmentType.PNG)
+    
+        
+    except Exception as e:
+        # Если не получилось создать диаграмму, fallback на текст
+        expected_path = EXPECTED_HOPS.get(target_ip, [])
+        text_schema = f"Ожидаемый путь для {target_ip}:\n"
+        for i, hop in enumerate(expected_path):
+            text_schema += f"Хоп {i+1}: {hop}\n"
+        allure.attach(text_schema, name="Ожидаемый маршрут", attachment_type=AttachmentType.TEXT)
 
 @allure.epic("Сетевые тесты")
 @allure.feature("Traceroute тестирование")
@@ -195,27 +241,6 @@ def create_network_topology_diagram():
         # Добавляем в allure отчет
         allure.attach(png_data, name="Сетевая топология", attachment_type=AttachmentType.PNG)
         
-        # Также добавляем описание
-        topology_description = """
-        ## Сетевая топология тестовой среды
-        
-        **Архитектура сети:**
-        - Клиент: 192.168.44.254 (тестовое устройство)
-        - PE Маршрутизатор: 192.168.44.1 (маршрутизатор провайдера)
-        - CE1: 192.168.43.2
-        - CE2: 192.168.41.2 
-        - CE3: 192.168.42.2
-        
-        **Сегменты сети:**
-        - 192.168.44.0/24 - сеть клиента
-        - 192.168.43.0/24 - сеть CE1
-        - 192.168.41.0/24 - сеть CE2
-        - 192.168.42.0/24 - сеть CE3
-        
-        **Назначение теста:** Проверка маршрутизации от клиента к CE устройствам через сеть провайдера
-        """
-        allure.attach(topology_description, name="Описание топологии", attachment_type=AttachmentType.TEXT)
-        
     except Exception as e:
         allure.attach(f"Ошибка создания схемы: {str(e)}", name="Ошибка диаграммы")
         print(f"DEBUG: Ошибка создания диаграммы: {e}")
@@ -224,40 +249,56 @@ def create_traceroute_path_diagram(hops_info, target_ip):
     """Создает диаграмму пути traceroute для конкретного целевого IP"""
     try:
         dot = graphviz.Digraph(comment=f'Traceroute Path to {target_ip}',
-                              graph_attr={'rankdir': 'TB', 'bgcolor': 'transparent', 'nodesep': '0.5'},
-                              node_attr={'style': 'filled', 'shape': 'ellipse', 'fontname': 'Arial', 'fontsize': '9'})
+                              graph_attr={'rankdir': 'TB', 'bgcolor': 'transparent', 'nodesep': '0.4'},
+                              node_attr={'style': 'filled', 'shape': 'ellipse', 'fontname': 'Arial', 'fontsize': '10'})
         
         # Добавляем начальную точку (клиент)
         dot.node('Start', 'Клиент\n192.168.44.254', **{'fillcolor': '#e6f3ff'})
         
         # Добавляем хопы
         previous_node = 'Start'
+        reached_target = False
+        
         for i, hop in enumerate(hops_info):
             if hop['actual_ip'] and hop['actual_ip'] != '*':
                 node_name = f'Hop{i+1}'
-                status_color = '#c8e6c9' if hop['is_correct'] else '#ffcdd2'
-                status_text = '✓' if hop['is_correct'] else '✗'
                 
-                # Определяем тип узла по IP
+                # Определяем цвет по статусу
+                if not hop['is_correct'] and hop['expected_ip'] != "Unknown":
+                    status_color = '#ffebee'  # красный для ошибок
+                    status_text = 'ОШИБКА'
+                elif hop['actual_ip'] == '192.168.44.1':
+                    status_color = '#fff3e0'  # оранжевый для PE
+                    status_text = 'PE'
+                elif hop['is_destination']:
+                    status_color = '#c8e6c9'  # зеленый для цели
+                    status_text = 'ЦЕЛЬ'
+                    reached_target = True
+                else:
+                    status_color = '#e3f2fd'  # синий для промежуточных
+                    status_text = 'ПРОМЕЖ'
+                
                 node_label = f'{status_text} Хоп {i+1}\n{hop["actual_ip"]}'
-                if hop['actual_ip'] == '192.168.44.1':
-                    node_label = f'{status_text} PE Маршрутизатор\n{hop["actual_ip"]}'
-                    status_color = '#fff3e0'
                 
                 dot.node(node_name, node_label, **{'fillcolor': status_color})
                 dot.edge(previous_node, node_name, label=f'TTL={i+1}')
                 previous_node = node_name
+                
+                if hop['is_destination']:
+                    break
         
-        # Добавляем целевую точку
-        dot.node('Target', f'Цель CE\n{target_ip}', **{'fillcolor': '#fff9c4'})
-        dot.edge(previous_node, 'Target', label='Достигнуто')
+        # Добавляем итоговую статистику
+        success = reached_target and all(h['is_correct'] for h in hops_info if h['expected_ip'] != "Unknown")
+        status_text = "УСПЕХ" if success else "ЧАСТИЧНО" if reached_target else "НЕУДАЧА"
+        
+        dot.attr(label=f'Traceroute к {target_ip} - {status_text}\nПройдено хопов: {len([h for h in hops_info if h["actual_ip"] != "*"])}',
+                labelloc='t', fontsize='12', fontname='Arial')
         
         png_data = dot.pipe(format='png')
-        allure.attach(png_data, name=f"Путь до {target_ip}", attachment_type=AttachmentType.PNG)
+        allure.attach(png_data, name=f"Фактический путь до {target_ip}", attachment_type=AttachmentType.PNG)
         
     except Exception as e:
         allure.attach(f"Ошибка создания диаграммы пути: {str(e)}", name="Ошибка диаграммы")
-        print(f"DEBUG: Ошибка создания диаграммы пути: {e}")
 
 @allure.epic("Сетевые тесты")
 @allure.feature("Сводный отчет")
@@ -268,6 +309,7 @@ def test_traceroute_summary():
     create_network_topology_diagram()
     
     summary_results = {}
+    failed_tests = []
     
     for ce_ip in IP_DST:
         with allure.step(f"Тестирование {ce_ip}"):
@@ -280,17 +322,45 @@ def test_traceroute_summary():
                 correct_hops = sum(1 for hop in hops_info if hop['is_correct'] or hop['expected_ip'] == "Unknown")
                 total_hops = len(hops_info)
                 
+                success = reached and correct_hops == total_hops
                 summary_results[ce_ip] = {
-                    'success': reached and correct_hops == total_hops,
+                    'success': success,
                     'reached': reached,
                     'correct_hops': correct_hops,
                     'total_hops': total_hops,
                     'path': [hop['actual_ip'] for hop in hops_info]
                 }
                 
+                if not success:
+                    failed_tests.append(f"{ce_ip} - не пройден")
+                
             except Exception as e:
                 summary_results[ce_ip] = {
                     'success': False,
                     'error': str(e)
                 }
+                failed_tests.append(f"{ce_ip} - ошибка: {str(e)}")
+    
+    with allure.step("Проверка результатов всех тестов"):
+        # Проверяем, что все тесты прошли успешно
+        all_success = all(result['success'] for result in summary_results.values())
+        
+        if not all_success:
+            error_msg = f"Не все тесты прошли успешно:\n" + "\n".join(failed_tests)
+            allure.attach(name="Ошибки в тестах")
+            pytest.fail(error_msg)
+        
+        any_success = any(result['success'] for result in summary_results.values())
+        assert any_success, "Ни один из traceroute тестов не прошел"
+    
+    # Добавляем сводную таблицу
+    with allure.step("Сводная таблица результатов"):
+        summary_table = "Цель | Успех | Достигнута | Правильные хопы | Всего хопов\n"
+        summary_table += "-" * 70 + "\n"
+        for ip, result in summary_results.items():
+            success_icon = "✅" if result['success'] else "❌"
+            reached_icon = "✅" if result['reached'] else "❌"
+            summary_table += f"{ip} | {success_icon} | {reached_icon} | {result['correct_hops']}/{result['total_hops']} | {result['total_hops']}\n"
+        
+        allure.attach(summary_table, name="Сводная таблица", attachment_type=AttachmentType.TEXT)
     
