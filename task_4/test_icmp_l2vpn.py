@@ -7,17 +7,13 @@ from scapy.layers.l2 import ARP, Ether, Dot1Q
 MAC_SRC = "de:ad:be:af:00:44"
 MAC_DST_LIST = [ "de:ad:be:af:00:41", "de:ad:be:af:00:42",  "de:ad:be:af:00:43" ]
 IP_SRC = "192.168.100.44"
-IP_DST = "192.168.100.100"  # Фиктивный IP для ARP-запроса
 
 CE4_INTERFACE = "enp3s0"
 VLAN_ID = 4028
 TIMEOUT = 2
 
 def send_arp_via_vlan(src_mac, dst_mac, src_ip, target_ip, vlan_id, interface):
-    """
-    Отправляет ARP-запрос через VLAN и возвращает ответ
-    """
-    # Создаем ARP-запрос с VLAN-тегом
+    
     pkt = (Ether(src=src_mac, dst=dst_mac) / 
            Dot1Q(vlan=vlan_id) / 
            ARP(op=1, hwsrc=src_mac, psrc=src_ip, 
@@ -30,9 +26,7 @@ def send_arp_via_vlan(src_mac, dst_mac, src_ip, target_ip, vlan_id, interface):
     return ans
 
 def send_icmp_via_vlan(src_mac, dst_mac, src_ip, dst_ip, vlan_id, interface):
-    """
-    Отправляет ICMP-запрос через VLAN и возвращает ответ
-    """
+
     # Создаем ICMP-пакет с VLAN-тегом
     pkt = (Ether(src=src_mac, dst=dst_mac) /
            Dot1Q(vlan=vlan_id) /
@@ -47,7 +41,7 @@ def send_icmp_via_vlan(src_mac, dst_mac, src_ip, dst_ip, vlan_id, interface):
 
 @pytest.mark.parametrize("target_mac", MAC_DST_LIST)
 def test_icmp_to_ce(target_mac):
-    # Предполагаем IP-адрес на основе MAC
+
     target_ip = f"192.168.100.{target_mac.split(':')[-1]}"
     
     response_pkt = send_icmp_via_vlan(MAC_SRC, target_mac, IP_SRC, 
@@ -56,7 +50,6 @@ def test_icmp_to_ce(target_mac):
     # Проверяем получение ответа
     assert response_pkt is not None, f"No ICMP reply received from {target_mac}"
     
-    # Анализируем структуру пакета
     assert Ether in response_pkt, "Ответ не содержит Ethernet-заголовок"
     assert IP in response_pkt, "Ответ не содержит IP-заголовок"
     assert ICMP in response_pkt, "Ответ не содержит ICMP-заголовок"
