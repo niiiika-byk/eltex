@@ -17,7 +17,7 @@ src_port = random.randint(1024, 65535)
 def telnet_connection_autoriz():
     """Устанавливает TCP соединение с маршрутизатором"""
     try:
-        print(f"Пытаюсь установить TCP соединение с {IP_DST}:{TELNET_PORT}")
+        #print(f"Пытаюсь установить TCP соединение с {IP_DST}:{TELNET_PORT}")
         
         # Отправляем SYN пакет
         syn_packet = Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=IP_SRC, dst=IP_DST)/TCP(sport=src_port,dport=TELNET_PORT, flags='S')
@@ -34,7 +34,7 @@ def telnet_connection_autoriz():
             return False, None
         
         if syn_ack_response.haslayer(TCP) and syn_ack_response[TCP].flags == 'SA':
-            print("Получен SYN-ACK ответ, соединение установлено")
+            #print("Получен SYN-ACK ответ, соединение установлено")
             
             # Формируем ACK пакет
             ack_packet = Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=IP_SRC,dst=IP_DST) / TCP(
