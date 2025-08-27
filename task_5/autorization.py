@@ -92,7 +92,6 @@ def authenticate_telnet(connection_params):
             data_length = 0
             if Raw in server_packet:
                 server_data = server_packet[Raw].load.decode('utf-8', errors='ignore')
-                print(f"Ответ сервера: {repr(server_data)}")
                 data_length = len(server_packet[Raw].load)
             else:
                 data_length = 1
@@ -169,10 +168,9 @@ def authenticate_telnet(connection_params):
         seq += len(password_data)
         
         #ждем ЭХО пароля от сервера
-
         print("\nОжидаем ЭХО пароля от сервера...")
         echo_response = sniff_telnet_response(src_port, timeout=3)
-        
+
         if echo_response:
             echo_packet = echo_response[0]
             
@@ -180,6 +178,7 @@ def authenticate_telnet(connection_params):
             if Raw in echo_packet:
                 echo_data = echo_packet[Raw].load.decode('utf-8', errors='ignore')
                 echo_length = len(echo_packet[Raw].load)
+                print(f"ЭХО пароля: {repr(echo_data)}")
             else:
                 echo_length = 1
             
@@ -189,33 +188,58 @@ def authenticate_telnet(connection_params):
             ack_packet = create_tcp_ack_packet(src_port, seq, ack)
             sendp(ack_packet, iface="enp1s0", verbose=0)
             print("Подтверждено получение эхо пароля")
-        
-        #ждем результат аутентификации
 
-        print("\nОжидаем результат аутентификации...")
-        response = sniff_telnet_response(src_port, timeout=5)
-        
-        if response:
+        # Ждем результат аутентификации - продолжаем слушать пока не получим welcome
+        print("\nОжидаем результат аутентификации (может быть несколько пакетов)...")
+        start_time = time.time()
+        timeout = 15
+        all_data = ""
+
+        while time.time() - start_time < timeout:
+            response = sniff_telnet_response(src_port, timeout=timeout - (time.time() - start_time))
+            
+            if not response:
+                print("Таймаут ожидания результата аутентификации")
+                break
+                
             server_packet = response[0]
             
+            # Обрабатываем данные пакета
             data_length = 0
+            server_data = ""
             if Raw in server_packet:
                 server_data = server_packet[Raw].load.decode('utf-8', errors='ignore')
                 data_length = len(server_packet[Raw].load)
+                all_data += server_data
             else:
                 data_length = 1
             
             ack = server_packet[TCP].seq + data_length
             
+            # Отправляем подтверждение
             ack_packet = create_tcp_ack_packet(src_port, seq, ack)
             sendp(ack_packet, iface="enp1s0", verbose=0)
             
-            if any(marker in server_data for marker in [">", "#", "Welcome"]):
-                print("Аутентификация успешна!")
+            # Проверяем наличие welcome или приглашения
+            if any(marker in all_data for marker in [">", "#", "Welcome", "Successfully", "Last login"]):
+                print(f"Аутентификация успешна! Полученные данные: {repr(all_data)}")
                 return True, seq, ack
-        
-        print("Аутентификация завершена")
-        return True, seq, ack
+                
+            # Если это просто \r\n или пустые данные, продолжаем ждать
+            if server_data.strip() in ["", "\r\n"]:
+                print("Получены служебные данные, продолжаем ожидание...")
+                continue
+                
+            print(f"Промежуточные данные: {repr(all_data)}")
+
+        print(f"Финальные полученные данные: {repr(all_data)}")
+
+        if any(marker in all_data for marker in [">", "#", "Welcome", "Successfully"]):
+            print("Аутентификация успешна!")
+            return True, seq, ack
+        else:
+            print("Аутентификация завершена, но не обнаружено приглашение")
+            return True, seq, ack  # или False в зависимости от требований
         
     except Exception as e:
         print(f"Ошибка при аутентификации: {e}")
