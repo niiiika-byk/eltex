@@ -1,8 +1,7 @@
-import os
 from scapy.all import *
 from scapy.layers.inet import IP, TCP
 from scapy.layers.l2 import Ether
-import random
+from tmp_main import *
 
 # Конфигурация маршрутизатора
 IP_DST = "192.168.17.12"
@@ -10,14 +9,11 @@ IP_SRC = "192.168.17.13"
 MAC_SRC = "de:ad:be:af:00:55"
 MAC_DST = "68:13:e2:d8:01:05" 
 TELNET_PORT = 23
-USERNAME = os.environ.get('ROUTER_USER', 'admin')
-PASSWORD = os.environ.get('ROUTER_PASSWORD', 'password')
-src_port = random.randint(1024, 65535)
 
 def telnet_connection():
     """Устанавливает TCP соединение с маршрутизатором"""
     try:
-        #print(f"Пытаюсь установить TCP соединение с {IP_DST}:{TELNET_PORT}")
+        src_port = random.randint(1024, 65535)
         
         # Отправляем SYN пакет
         syn_packet = Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=IP_SRC, dst=IP_DST)/TCP(sport=src_port,dport=TELNET_PORT, flags='S')
@@ -48,6 +44,7 @@ def telnet_connection():
             print("TCP соединение установлено успешно")
             
             connection_params = {
+                'src_port': src_port,
                 'seq': syn_ack_response[TCP].ack,
                 'ack': syn_ack_response[TCP].seq + 1
             }
