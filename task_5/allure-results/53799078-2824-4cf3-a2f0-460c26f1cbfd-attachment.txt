@@ -1,1 +1,0 @@
-Command sent: show running-config
