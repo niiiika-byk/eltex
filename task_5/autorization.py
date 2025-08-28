@@ -1,51 +1,5 @@
 from tcp_handshake import *
-
-def create_tcp_ack_packet(sport, seq, ack):
-    """Создает TCP пакет только с ACK флагом"""
-    return Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=IP_SRC, dst=IP_DST) / TCP(
-        sport=sport,
-        dport=TELNET_PORT,
-        seq=seq,
-        ack=ack,
-        flags="A"
-    )
-
-def create_telnet_data_packet(data, sport, seq, ack):
-    """ Создает IP/TCP пакет с TELNET данными """
-    return Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=IP_SRC, dst=IP_DST) / TCP(
-        dport=TELNET_PORT,
-        sport=sport,
-        flags='PA',   # PSH + ACK
-        seq=seq,
-        ack=ack
-    )/Raw(load=data)
-
-def sniff_telnet_response(src_port, timeout=5):
-    """ Ожидание ответ от TELNET сервера """
-    return sniff(
-        filter=f"tcp and host {IP_DST} and port {src_port}",
-        count=1,
-        timeout=timeout,
-        iface="enp1s0"
-    )
-
-def handle_telnet_options(packet, src_port, seq, ack):
-    """Минимальная обработка TELNET опций - всегда отправляем стандартный ответ"""
-    if Raw in packet and b'\xff' in packet[Raw].load:
-        print("\nОбнаружены TELNET опции, отправляем стандартный ответ")
-        
-        telnet_response = bytes([
-            0xFF, 0xFB, 0x01,  # WILL Echo
-            0xFF, 0xFD, 0x01,  # DO Echo
-            0xFF, 0xFB, 0x1F,  # WILL NAWS  
-            0xFF, 0xFD, 0x03   # DO Suppress Go Ahead
-        ])
-        
-        response_packet = create_telnet_data_packet(telnet_response, src_port, seq, ack)
-        sendp(response_packet, iface="enp1s0", verbose=0)
-        return True, len(telnet_response)
-    
-    return False, 0
+from create_packet import *
 
 def authenticate_telnet(connection_params):
     """Выполняет аутентификацию в TELNET сессии и возвращает (success, seq, ack)"""
@@ -220,8 +174,8 @@ def authenticate_telnet(connection_params):
             ack_packet = create_tcp_ack_packet(src_port, seq, ack)
             sendp(ack_packet, iface="enp1s0", verbose=0)
             
-            # Проверяем наличие welcome или приглашения
-            if any(marker in all_data for marker in [">", "#", "Welcome", "Successfully", "Last login"]):
+            # Проверяем наличие приглашения ко вводу
+            if any(marker in all_data for marker in ["#"]):
                 print(f"Аутентификация успешна! Полученные данные: {repr(all_data)}")
                 return True, seq, ack
                 
@@ -234,12 +188,12 @@ def authenticate_telnet(connection_params):
 
         print(f"Финальные полученные данные: {repr(all_data)}")
 
-        if any(marker in all_data for marker in [">", "#", "Welcome", "Successfully"]):
+        if any(marker in all_data for marker in ["#", "Welcome", "Successfully"]):
             print("Аутентификация успешна!")
             return True, seq, ack
         else:
             print("Аутентификация завершена, но не обнаружено приглашение")
-            return True, seq, ack  # или False в зависимости от требований
+            return False, seq, ack
         
     except Exception as e:
         print(f"Ошибка при аутентификации: {e}")
@@ -250,20 +204,20 @@ def authenticate_telnet(connection_params):
 
 # Пример использования
 if __name__ == "__main__":
+
+    #настраиваем tcp соединение с сервером
     parametrs = telnet_connection_autoriz()
     if parametrs != None:
+
+        #входим в систему
         auth_result, seq, ack = authenticate_telnet(parametrs)
-        fin_packet = Ether(src=MAC_SRC, dst=MAC_DST) / IP(src=IP_SRC, dst=IP_DST) / TCP(
-                    dport=TELNET_PORT,
-                    sport=src_port,
-                    seq=seq,
-                    ack=ack,
-                    flags='FA',  # FIN + ACK
-                )
-        sendp(fin_packet, iface="enp1s0", verbose=0)
-        print("FIN пакет отправлен для закрытия сессии")
-        ack_packet = create_tcp_ack_packet(src_port, seq, ack)
-        sendp(ack_packet, iface="enp1s0", verbose=0)
+        connection_params = {
+                'seq': ack,
+                'ack': seq + 1
+            }
+        
+        #закрываем tcp соединение
+        close_telnet_connection(src_port, seq, ack)
 
     else:
         print ("Не удалось получить параметры соединения")
