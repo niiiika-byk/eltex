@@ -54,9 +54,11 @@ def handle_telnet_options(packet, src_port, seq, ack):
     
     return False, 0
 
-def close_telnet_connection(src_port, seq, ack):
+def close_telnet_connection(src_port, connection_params):
     """Закрывает TCP соединение с ожиданием подтверждения"""
     try:
+        seq = connection_params['seq']
+        ack = connection_params['ack']
         print("\nЗакрытие TCP соединения...")
         
         # Отправляем FIN пакет
@@ -80,11 +82,11 @@ def close_telnet_connection(src_port, seq, ack):
         )
         
         if fin_ack_response:
-            print("\nПолучено подтверждение FIN")
+            print("Получено подтверждение FIN")
             ack_packet = create_tcp_ack_packet(src_port, seq + 1, ack + 1)
             sendp(ack_packet, iface="enp1s0", verbose=0)
         else:
-            print("\nТаймаут ожидания подтверждения FIN")
+            print("Таймаут ожидания подтверждения FIN")
             ack_packet = create_tcp_ack_packet(src_port, seq, ack)
             sendp(ack_packet, iface="enp1s0", verbose=0)
         

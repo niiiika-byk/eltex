@@ -14,7 +14,7 @@ USERNAME = os.environ.get('ROUTER_USER', 'admin')
 PASSWORD = os.environ.get('ROUTER_PASSWORD', 'password')
 src_port = random.randint(1024, 65535)
 
-def telnet_connection_autoriz():
+def telnet_connection():
     """Устанавливает TCP соединение с маршрутизатором"""
     try:
         #print(f"Пытаюсь установить TCP соединение с {IP_DST}:{TELNET_PORT}")

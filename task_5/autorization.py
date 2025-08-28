@@ -8,13 +8,15 @@ def authenticate_telnet(connection_params):
         seq = connection_params['seq']
         ack = connection_params['ack']
 
+        connection_params = {}
+
         #получение пакета с данными, конкретно опции telnet
 
         response = sniff_telnet_response(src_port, timeout=3)
         
         if response:
             server_packet = response[0]
-            print(f"Получен пакет с опциями")
+            print(f"\nПолучен пакет с опциями")
             
             data_length = 0
             if Raw in server_packet:
@@ -30,7 +32,7 @@ def authenticate_telnet(connection_params):
                 seq += options_length
             
             # ACK с обновленным значением
-            print("\nОтправляем ACK для подтверждения TELNET опций...")
+            print("Отправляем ACK для подтверждения TELNET опций...")
             ack_packet = create_tcp_ack_packet(src_port, seq, ack)
             sendp(ack_packet, iface="enp1s0", verbose=0)
 
@@ -66,7 +68,7 @@ def authenticate_telnet(connection_params):
         
         #ждем ЭХО логина от сервера
 
-        print("\nОжидаем ЭХО логина от сервера...")
+        print("Ожидаем ЭХО логина от сервера...")
         echo_response = sniff_telnet_response(src_port, timeout=3)
         
         if echo_response:
@@ -122,7 +124,8 @@ def authenticate_telnet(connection_params):
         seq += len(password_data)
         
         #ждем ЭХО пароля от сервера
-        print("\nОжидаем ЭХО пароля от сервера...")
+        
+        print("Ожидаем ЭХО пароля от сервера...")
         echo_response = sniff_telnet_response(src_port, timeout=3)
 
         if echo_response:
@@ -132,18 +135,18 @@ def authenticate_telnet(connection_params):
             if Raw in echo_packet:
                 echo_data = echo_packet[Raw].load.decode('utf-8', errors='ignore')
                 echo_length = len(echo_packet[Raw].load)
-                print(f"ЭХО пароля: {repr(echo_data)}")
+                
             else:
                 echo_length = 1
             
             ack = echo_packet[TCP].seq + echo_length
-            print(f"ACK после эхо пароля: {ack}")
             
             ack_packet = create_tcp_ack_packet(src_port, seq, ack)
             sendp(ack_packet, iface="enp1s0", verbose=0)
             print("Подтверждено получение эхо пароля")
 
         # Ждем результат аутентификации - продолжаем слушать пока не получим welcome
+
         print("\nОжидаем результат аутентификации (может быть несколько пакетов)...")
         start_time = time.time()
         timeout = 15
@@ -176,48 +179,121 @@ def authenticate_telnet(connection_params):
             
             # Проверяем наличие приглашения ко вводу
             if any(marker in all_data for marker in ["#"]):
-                print(f"Аутентификация успешна! Полученные данные: {repr(all_data)}")
-                return True, seq, ack
+                print(f"Аутентификация успешна!")
+                connection_params = {
+                    'seq': seq,
+                    'ack': ack
+                }
+                return True, connection_params
                 
             # Если это просто \r\n или пустые данные, продолжаем ждать
             if server_data.strip() in ["", "\r\n"]:
                 print("Получены служебные данные, продолжаем ожидание...")
                 continue
-                
-            print(f"Промежуточные данные: {repr(all_data)}")
 
-        print(f"Финальные полученные данные: {repr(all_data)}")
-
-        if any(marker in all_data for marker in ["#", "Welcome", "Successfully"]):
+        if any(marker in all_data for marker in ["Welcome", "Successfully"]):
             print("Аутентификация успешна!")
-            return True, seq, ack
+            connection_params = {
+                    'seq': seq,
+                    'ack': ack
+                }
+            return True, connection_params
         else:
             print("Аутентификация завершена, но не обнаружено приглашение")
-            return False, seq, ack
+            connection_params = {
+                    'seq': seq,
+                    'ack': ack
+                }
+            return False, connection_params
         
     except Exception as e:
         print(f"Ошибка при аутентификации: {e}")
         import traceback
         traceback.print_exc()
-        return False, seq, ack
+        connection_params = {
+                    'seq': seq,
+                    'ack': ack
+                }
+        return False, connection_params
+
+def send_telnet_command(connection_params, command):
+    """Функция для отправки команд"""
+    try:
+        seq = connection_params['seq']
+        ack = connection_params['ack']
+        connection_params = {}
+
+        #отправляем команду
+        
+        full_command = command + "\r\n"
+        print(f"\nОтправка команды: {repr(full_command)}")
+        command_packet = create_telnet_data_packet(full_command, src_port, seq, ack)
+        sendp(command_packet, iface="enp1s0", verbose=0)
+
+        seq += len(full_command)
+        
+        #ждем ответ
+
+        print("\nОжидаем ответ...")
+        all_data = ""
+        
+        while True:
+            response = sniff_telnet_response(src_port, timeout=5)
+            if not response:
+                break
+                
+            server_packet = response[0]
+            
+            if not (server_packet.haslayer(TCP) and server_packet[TCP].flags in ['PA', 'A']):
+                continue
+            data_length = len(server_packet[TCP].payload)            
+
+            ack = server_packet[TCP].seq + data_length
+            
+            #получаем данные
+            if Raw in server_packet:
+                server_data = server_packet[Raw].load.decode('utf-8', errors='ignore')
+                all_data += server_data
+                print(f"\nДанные: {repr(server_data)}")
+            
+            #подтверждаем получение
+
+            ack_packet = create_tcp_ack_packet(src_port, seq, ack)
+            sendp(ack_packet, iface="enp1s0", verbose=0)
+            print("ACK отправлен")
+            
+            if any(marker in all_data for marker in ["#", ">"]):
+                break
+        
+        connection_params = {
+                'seq': ack,
+                'ack': seq
+            }
+
+        return True, connection_params
+        
+    except Exception as e:
+        print(f"\nОшибка: {e}")
+        return False, connection_params
 
 
 # Пример использования
 if __name__ == "__main__":
 
     #настраиваем tcp соединение с сервером
-    parametrs = telnet_connection_autoriz()
+    parametrs = telnet_connection()
     if parametrs != None:
 
         #входим в систему
-        auth_result, seq, ack = authenticate_telnet(parametrs)
-        connection_params = {
-                'seq': ack,
-                'ack': seq + 1
-            }
-        
+        auth_result, connection_params = authenticate_telnet(parametrs)
+
+        #запрашиваем кол-во пользователей
+        auth_result, connection_params = send_telnet_command(connection_params, "show users")
+
+
+
         #закрываем tcp соединение
-        close_telnet_connection(src_port, seq, ack)
+        close_telnet_connection(src_port, connection_params)
 
     else:
         print ("Не удалось получить параметры соединения")
