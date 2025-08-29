@@ -1,0 +1,2 @@
+Network snapshot: session_2_after_close
+Timestamp: 1756372269.2340505

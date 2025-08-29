@@ -1,0 +1,9 @@
+Ошибка при установке соединения: [Errno 1] Operation not permitted
+Пытаюсь выполнить аутентификацию...
+Ошибка при аутентификации: tuple indices must be integers or slices, not str
+Ошибка при установке соединения: [Errno 1] Operation not permitted
+Пытаюсь выполнить аутентификацию...Ошибка при установке соединения: [Errno 1] Operation not permitted
+Ошибка при аутентификации: tuple indices must be integers or slices, not str
+
+Пытаюсь выполнить аутентификацию...
+Ошибка при аутентификации: tuple indices must be integers or slices, not str

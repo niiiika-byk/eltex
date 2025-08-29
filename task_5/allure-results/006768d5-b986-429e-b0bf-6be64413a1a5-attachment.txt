@@ -1,0 +1,1 @@
+Ошибка в сессии 1: cannot access local variable 'src_port' where it is not associated with a value
